@@ -45,7 +45,6 @@ import org.apache.rocketmq.client.consumer.MQPullConsumerScheduleService;
 import org.apache.rocketmq.client.consumer.PullResult;
 import org.apache.rocketmq.client.consumer.PullTaskCallback;
 import org.apache.rocketmq.client.consumer.PullTaskContext;
-import org.apache.rocketmq.client.consumer.store.OffsetStore;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
@@ -68,7 +67,7 @@ public class RocketMQSource<OUT> extends RichParallelSourceFunction<OUT>
     implements CheckpointedFunction, CheckpointListener, ResultTypeQueryable<OUT> {
 
     private static final long serialVersionUID = 1L;
-
+    private static final int MAX_NUM_PENDING_CHECKPOINTS = 100;
     private static final Logger LOG = LoggerFactory.getLogger(RocketMQSource.class);
 
     private transient MQPullConsumerScheduleService pullConsumerScheduleService;
@@ -308,7 +307,11 @@ public class RocketMQSource<OUT> extends RichParallelSourceFunction<OUT>
         }
 
         pendingOffsetsToCommit.put(context.getCheckpointId(), currentOffsets);
-
+        
+        while (pendingOffsetsToCommit.size() > MAX_NUM_PENDING_CHECKPOINTS) {
+            pendingOffsetsToCommit.remove(0);
+        }
+        
         if (LOG.isDebugEnabled()) {
             LOG.debug("Snapshotted state, last processed offsets: {}, checkpoint id: {}, timestamp: {}",
                 offsetTable, context.getCheckpointId(), context.getCheckpointTimestamp());
